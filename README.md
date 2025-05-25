@@ -4,6 +4,8 @@ ArchiFusion is a revolutionary AI-powered platform that transforms your architec
 
 **From Words to Worlds** - Turn architectural concepts into reality with the power of AI.
 
+<img width="1482" alt="image" src="https://github.com/user-attachments/assets/404bea95-05fa-4afb-bf51-e7d6650199f7" />
+
 ## 🚀 Key Features
 
 - **Text-to-Architecture:** Transform natural language descriptions into detailed 3D building models
@@ -20,7 +22,7 @@ ArchiFusion is a revolutionary AI-powered platform that transforms your architec
 - **3D Visualization:** Three.js
 - **AI Integration:** Azure OpenAI, Azure Computer Vision
 
-## 🚦 Getting Started
+## 🚀 Getting Started
 
 ### Installation
 
@@ -52,10 +54,6 @@ AZURE_OPENAI_API_VERSION=2023-12-01-preview
 # Azure Computer Vision
 AZURE_VISION_KEY=your_azure_vision_key
 AZURE_VISION_ENDPOINT=https://your-vision-resource.cognitiveservices.azure.com
-
-# Authentication (Optional)
-AUTH_SECRET=your_auth_secret_key
-NEXTAUTH_URL=http://localhost:3000
 ```
 
 Run the development server:
@@ -97,6 +95,8 @@ export const AGENT_CONFIG = {
 ```
 
 ### Setting Up Azure Services
+
+Check the [Azure Setup Guide](README_SETUP.md) for detailed instructions on configuring Azure OpenAI and Computer Vision services.
 
 **Azure OpenAI:**
 

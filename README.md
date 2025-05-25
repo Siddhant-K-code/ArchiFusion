@@ -4,6 +4,8 @@ ArchiFusion is a revolutionary AI-powered platform that transforms your architec
 
 **From Words to Worlds** - Turn architectural concepts into reality with the power of AI.
 
+<img width="1482" alt="image" src="https://github.com/user-attachments/assets/404bea95-05fa-4afb-bf51-e7d6650199f7" />
+
 ## 🚀 Key Features
 
 - **Text-to-Architecture:** Transform natural language descriptions into detailed 3D building models

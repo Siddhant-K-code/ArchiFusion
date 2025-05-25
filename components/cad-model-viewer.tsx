@@ -165,6 +165,10 @@ export function CadModelViewer({
                 containerRef.current.clientHeight
             );
             containerRef.current.appendChild(renderer.domElement);
+            
+            // Expose renderer and scene to the canvas for export functionality
+            (renderer.domElement as any).__three_renderer = renderer;
+            (renderer.domElement as any).__three_scene = scene;
 
             // Add controls
             const controls = new OrbitControls(camera, renderer.domElement);
@@ -1383,7 +1387,7 @@ export function CadModelViewer({
     }
 
     return (
-        <div className="relative w-full h-full">
+        <div className="relative w-full h-full cad-viewer-container">
             {isLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
                     <div className="text-center">

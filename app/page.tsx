@@ -288,12 +288,86 @@ export default function Home() {
         });
     };
 
-    const handleSaveModel = (format: string) => {
-        // In a real app, this would trigger a download of the model in the specified format
-        toast({
-            title: `Model saved as ${format.toUpperCase()}`,
-            description: `Your model has been exported in ${format.toUpperCase()} format.`,
-        });
+    const handleSaveModel = async (format: string) => {
+        try {
+            // Get the Three.js scene from the CAD viewer
+            const viewerContainer = document.querySelector('.cad-viewer-container');
+            if (!viewerContainer) {
+                throw new Error('3D viewer not found');
+            }
+            
+            const canvas = viewerContainer.querySelector('canvas');
+            if (!canvas) {
+                throw new Error('3D scene not initialized');
+            }
+
+            // Get the Three.js renderer and scene from the canvas
+            const renderer = (canvas as any).__three_renderer;
+            const scene = (canvas as any).__three_scene;
+            
+            if (!renderer || !scene) {
+                throw new Error('3D scene data not accessible');
+            }
+
+            let output: string;
+            let filename: string;
+            let mimeType: string;
+
+            if (format === 'gltf') {
+                // Dynamic import of GLTFExporter
+                const { GLTFExporter } = await import('three/examples/jsm/exporters/GLTFExporter.js');
+                const exporter = new GLTFExporter();
+                
+                output = await new Promise((resolve, reject) => {
+                    exporter.parse(
+                        scene,
+                        (gltf) => {
+                            resolve(JSON.stringify(gltf, null, 2));
+                        },
+                        (error) => {
+                            reject(error);
+                        },
+                        { binary: false }
+                    );
+                });
+                
+                filename = `architectural_model_${Date.now()}.gltf`;
+                mimeType = 'application/json';
+            } else if (format === 'obj') {
+                // Dynamic import of OBJExporter
+                const { OBJExporter } = await import('three/examples/jsm/exporters/OBJExporter.js');
+                const exporter = new OBJExporter();
+                
+                output = exporter.parse(scene);
+                filename = `architectural_model_${Date.now()}.obj`;
+                mimeType = 'text/plain';
+            } else {
+                throw new Error('Unsupported format');
+            }
+
+            // Create and trigger download
+            const blob = new Blob([output], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            toast({
+                title: `Model exported as ${format.toUpperCase()}`,
+                description: `Your model has been downloaded as ${filename}`,
+            });
+        } catch (error) {
+            console.error('Export error:', error);
+            toast({
+                title: 'Export failed',
+                description: `Could not export model: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                variant: 'destructive',
+            });
+        }
     };
 
     const handleZoom = (direction: "in" | "out") => {

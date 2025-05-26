@@ -10,6 +10,7 @@ import { SponsorsBanner } from "@/components/sponsors-banner";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
+    metadataBase: new URL("https://archifusion.netlify.app"),
     title: "ArchiFusion - AI Architectural Designer",
     description:
         "Transform your architectural ideas into stunning 3D building models. From text descriptions to detailed floor plans - houses, offices, retail spaces, and more.",

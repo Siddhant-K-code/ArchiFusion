@@ -12,6 +12,28 @@ export const metadata = {
     title: "ArchiFusion - AI Architectural Designer",
     description:
         "Transform your architectural ideas into stunning 3D building models. From text descriptions to detailed floor plans - houses, offices, retail spaces, and more.",
+    openGraph: {
+        title: "ArchiFusion - AI Architectural Designer",
+        description: "Transform architectural ideas into stunning 3D building models with AI",
+        url: "https://archifusion.netlify.app",
+        siteName: "ArchiFusion",
+        images: [
+            {
+                url: "/og.jpg",
+                width: 1200,
+                height: 630,
+                alt: "ArchiFusion - AI Architectural Designer",
+            },
+        ],
+        locale: "en_US",
+        type: "website",
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: "ArchiFusion - AI Architectural Designer",
+        description: "Transform architectural ideas into stunning 3D building models with AI",
+        images: ["/og.jpg"],
+    },
     icons: {
         icon: [
             { url: "/logo.svg", type: "image/svg+xml" }, // Add SVG logo as primary favicon

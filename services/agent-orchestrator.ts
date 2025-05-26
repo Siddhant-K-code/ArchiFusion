@@ -19,44 +19,71 @@ export class AgentOrchestrator {
     ): Promise<any> {
         console.log("Agent Orchestrator processing design request...");
 
-        try {
-            // Step 1: Interpret the requirements
-            console.log("Step 1: Interpreting requirements...");
-            const interpreterResult = await this.interpreterAgent.execute({
-                prompt,
-                sketchData,
-            });
+        // Set timeout for agent processing
+        const agentTimeout = 15000; // 15 seconds for agent processing
+        
+        return Promise.race([
+            this.executeAgentWorkflow(prompt, sketchData),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Agent processing timeout exceeded")), agentTimeout)
+            )
+        ]);
+    }
 
-            if (interpreterResult.error) {
+    private async executeAgentWorkflow(
+        prompt: string,
+        sketchData?: string | null
+    ): Promise<any> {
+        try {
+            // Process agents in parallel where possible
+            console.log("Step 1: Interpreting requirements...");
+            const interpreterResult = await Promise.race([
+                this.interpreterAgent.execute({ prompt, sketchData }),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error("Interpreter timeout")), 5000)
+                )
+            ]);
+
+            if ((interpreterResult as any).error) {
                 throw new Error(
-                    `Interpreter agent failed: ${interpreterResult.error}`
+                    `Interpreter agent failed: ${(interpreterResult as any).error}`
                 );
             }
 
             // Step 2: Generate architectural design
             console.log("Step 2: Generating architectural design...");
-            const designerResult = await this.designerAgent.execute({
-                requirements: interpreterResult.requirements,
-            });
+            const designerResult = await Promise.race([
+                this.designerAgent.execute({
+                    requirements: (interpreterResult as any).requirements,
+                }),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error("Designer timeout")), 5000)
+                )
+            ]);
 
-            if (designerResult.error) {
+            if ((designerResult as any).error) {
                 throw new Error(
-                    `Designer agent failed: ${designerResult.error}`
+                    `Designer agent failed: ${(designerResult as any).error}`
                 );
             }
 
             // Step 3: Generate Three.js visualization code
             console.log("Step 3: Generating visualization code...");
-            const rendererResult = await this.rendererAgent.execute({
-                design: designerResult.design,
-                requirements: interpreterResult.requirements,
-            });
+            const rendererResult = await Promise.race([
+                this.rendererAgent.execute({
+                    design: (designerResult as any).design,
+                    requirements: (interpreterResult as any).requirements,
+                }),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error("Renderer timeout")), 5000)
+                )
+            ]);
 
             // Return the complete result
             return {
-                requirements: interpreterResult.requirements,
-                modelData: designerResult.design,
-                code: rendererResult.code,
+                requirements: (interpreterResult as any).requirements,
+                modelData: (designerResult as any).design,
+                code: (rendererResult as any).code,
                 originalPrompt: prompt,
                 sketchAnalysisPerformed: !!sketchData,
             };

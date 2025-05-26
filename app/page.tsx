@@ -171,6 +171,12 @@ export default function Home() {
             // Mark OpenAI processing as active
             updateProcessingStep("openai", "processing");
 
+            // Create abort controller for timeout handling
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+            }, 25000); // 25 second timeout
+
             // Call our API endpoint - connects to Azure services
             const response = await fetch("/api/cad-generator", {
                 method: "POST",
@@ -178,7 +184,10 @@ export default function Home() {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify(payload),
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             // If sketch or photo was provided, mark vision processing as complete
             if (sketchData || photoData) {

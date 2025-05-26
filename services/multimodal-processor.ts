@@ -101,33 +101,43 @@ export class MultimodalProcessor {
             photoLength: inputs.photo?.length || 0
         });
 
+        // Set overall timeout for the entire operation
+        const processingTimeout = 25000; // 25 seconds, leaving 5s buffer before Netlify timeout
+        
+        return Promise.race([
+            this.processInputsWithTimeout(inputs),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Processing timeout exceeded")), processingTimeout)
+            )
+        ]);
+    }
+
+    private async processInputsWithTimeout(inputs: {
+        text?: string;
+        sketch?: string;
+        speech?: string;
+        photo?: string;
+    }): Promise<any> {
         // Use Responsible AI tools to validate inputs if available
         if (this.moderationClient) {
             await this.validateInputsWithResponsibleAI(inputs);
         }
 
-        // Process sketch with Computer Vision (if provided)
-        let sketchAnalysis = null;
-        if (inputs.sketch) {
-            try {
-                sketchAnalysis = await analyzeSketch(inputs.sketch);
-            } catch (error) {
-                console.error("Error in sketch analysis:", error);
-                // Continue with other modalities if one fails
-            }
-        }
+        // Process inputs in parallel where possible to reduce total time
+        const [sketchAnalysis, photoAnalysis] = await Promise.allSettled([
+            inputs.sketch ? this.processSketchWithTimeout(inputs.sketch) : Promise.resolve(null),
+            inputs.photo ? this.processPhotoWithTimeout(inputs.photo) : Promise.resolve(null)
+        ]);
 
-        // Process photo of real building/space (if provided)
-        let photoAnalysis = null;
-        if (inputs.photo) {
-            try {
-                console.log("Starting photo analysis...");
-                photoAnalysis = await this.processPhoto(inputs.photo);
-                console.log("Photo analysis completed:", !!photoAnalysis);
-            } catch (error) {
-                console.error("Error in photo analysis:", error);
-                // Continue with other modalities if one fails
-            }
+        // Extract results from settled promises
+        const sketchResult = sketchAnalysis.status === 'fulfilled' ? sketchAnalysis.value : null;
+        const photoResult = photoAnalysis.status === 'fulfilled' ? photoAnalysis.value : null;
+
+        if (sketchAnalysis.status === 'rejected') {
+            console.error("Sketch analysis failed:", sketchAnalysis.reason);
+        }
+        if (photoAnalysis.status === 'rejected') {
+            console.error("Photo analysis failed:", photoAnalysis.reason);
         }
 
         // Create a unified analysis by combining all input modalities
@@ -135,12 +145,30 @@ export class MultimodalProcessor {
         const unifiedAnalysis = await this.combineInputsWithGPT4V({
             text: inputs.text || "",
             speechText: inputs.speech || "",
-            sketchAnalysis,
-            photoAnalysis,
+            sketchAnalysis: sketchResult,
+            photoAnalysis: photoResult,
         });
 
         console.log("Multimodal processing completed successfully");
         return unifiedAnalysis;
+    }
+
+    private async processSketchWithTimeout(sketch: string): Promise<any> {
+        return Promise.race([
+            analyzeSketch(sketch),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Sketch analysis timeout")), 8000)
+            )
+        ]);
+    }
+
+    private async processPhotoWithTimeout(photo: string): Promise<any> {
+        return Promise.race([
+            this.processPhoto(photo),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Photo analysis timeout")), 10000)
+            )
+        ]);
     }
 
     private async validateInputsWithResponsibleAI(inputs: any): Promise<void> {

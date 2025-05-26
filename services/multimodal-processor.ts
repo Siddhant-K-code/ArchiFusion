@@ -101,56 +101,129 @@ export class MultimodalProcessor {
             photoLength: inputs.photo?.length || 0
         });
 
-        // Set overall timeout for the entire operation
-        const processingTimeout = 25000; // 25 seconds, leaving 5s buffer before Netlify timeout
-        
-        return Promise.race([
-            this.processInputsWithTimeout(inputs),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Processing timeout exceeded")), processingTimeout)
-            )
-        ]);
+        // Process efficiently with smart optimizations
+        return this.processInputsOptimized(inputs);
     }
 
-    private async processInputsWithTimeout(inputs: {
+    private async processInputsOptimized(inputs: {
         text?: string;
         sketch?: string;
         speech?: string;
         photo?: string;
     }): Promise<any> {
-        // Use Responsible AI tools to validate inputs if available
+        console.log("Starting optimized multimodal processing...");
+        
+        // Skip validation if not configured to save time
         if (this.moderationClient) {
             await this.validateInputsWithResponsibleAI(inputs);
         }
 
-        // Process inputs in parallel where possible to reduce total time
-        const [sketchAnalysis, photoAnalysis] = await Promise.allSettled([
-            inputs.sketch ? this.processSketchWithTimeout(inputs.sketch) : Promise.resolve(null),
-            inputs.photo ? this.processPhotoWithTimeout(inputs.photo) : Promise.resolve(null)
+        // Smart input prioritization - process based on what's most likely to succeed quickly
+        const hasText = !!(inputs.text || inputs.speech);
+        const hasVisuals = !!(inputs.sketch || inputs.photo);
+
+        // Strategy 1: If we have text input, start with that and process visuals in parallel
+        if (hasText && hasVisuals) {
+            return this.processTextWithVisualsParallel(inputs);
+        }
+        
+        // Strategy 2: Text-only processing (fastest)
+        if (hasText && !hasVisuals) {
+            return this.processTextOnly(inputs);
+        }
+        
+        // Strategy 3: Visual-only processing (slower but more targeted)
+        if (!hasText && hasVisuals) {
+            return this.processVisualsOnly(inputs);
+        }
+
+        // Fallback: shouldn't happen due to validation, but handle gracefully
+        throw new Error("No valid inputs provided");
+    }
+
+    private async processTextOnly(inputs: any): Promise<any> {
+        console.log("Processing text-only input (fast path)");
+        
+        const textContent = inputs.text || inputs.speech || "";
+        
+        // Skip Azure processing if not configured, use intelligent text parsing
+        if (!this.openAIClient) {
+            return this.generateFromTextFallback(textContent);
+        }
+
+        try {
+            return await this.combineInputsWithGPT4V({
+                text: textContent,
+                speechText: inputs.speech || "",
+                sketchAnalysis: null,
+                photoAnalysis: null,
+            });
+        } catch (error) {
+            console.warn("Azure text processing failed, using intelligent fallback:", error);
+            return this.generateFromTextFallback(textContent);
+        }
+    }
+
+    private async processTextWithVisualsParallel(inputs: any): Promise<any> {
+        console.log("Processing text with visuals in parallel");
+        
+        // Start text processing immediately (fastest)
+        const textProcessingPromise = this.processTextOnly(inputs);
+        
+        // Process visuals in parallel with shorter timeouts
+        const visualPromises = [
+            inputs.sketch ? this.processSketchOptimized(inputs.sketch) : Promise.resolve(null),
+            inputs.photo ? this.processPhotoOptimized(inputs.photo) : Promise.resolve(null)
+        ];
+
+        try {
+            // Wait for text processing first (usually fastest)
+            const textResult = await textProcessingPromise;
+            
+            // Try to enhance with visual data if available quickly
+            const visualResults = await Promise.allSettled(visualPromises);
+            const [sketchResult, photoResult] = visualResults.map(r => 
+                r.status === 'fulfilled' ? r.value : null
+            );
+
+            // If we got visual data, enhance the text result
+            if (sketchResult || photoResult) {
+                return this.enhanceWithVisualData(textResult, sketchResult, photoResult);
+            }
+
+            return textResult;
+            
+        } catch (error) {
+            console.warn("Parallel processing failed, using text-only result:", error);
+            return this.processTextOnly(inputs);
+        }
+    }
+
+    private async processVisualsOnly(inputs: any): Promise<any> {
+        console.log("Processing visual-only input");
+        
+        // Process visuals with more time since it's the primary input
+        const [sketchResult, photoResult] = await Promise.allSettled([
+            inputs.sketch ? this.processSketchOptimized(inputs.sketch) : Promise.resolve(null),
+            inputs.photo ? this.processPhotoOptimized(inputs.photo) : Promise.resolve(null)
         ]);
 
-        // Extract results from settled promises
-        const sketchResult = sketchAnalysis.status === 'fulfilled' ? sketchAnalysis.value : null;
-        const photoResult = photoAnalysis.status === 'fulfilled' ? photoAnalysis.value : null;
+        const sketch = sketchResult.status === 'fulfilled' ? sketchResult.value : null;
+        const photo = photoResult.status === 'fulfilled' ? photoResult.value : null;
 
-        if (sketchAnalysis.status === 'rejected') {
-            console.error("Sketch analysis failed:", sketchAnalysis.reason);
-        }
-        if (photoAnalysis.status === 'rejected') {
-            console.error("Photo analysis failed:", photoAnalysis.reason);
+        if (!sketch && !photo) {
+            throw new Error("Failed to process any visual inputs");
         }
 
-        // Create a unified analysis by combining all input modalities
-        console.log("Combining inputs with GPT-4V...");
-        const unifiedAnalysis = await this.combineInputsWithGPT4V({
-            text: inputs.text || "",
-            speechText: inputs.speech || "",
-            sketchAnalysis: sketchResult,
-            photoAnalysis: photoResult,
+        // Generate description from visual analysis
+        const generatedPrompt = this.generatePromptFromVisuals(sketch, photo);
+        
+        return this.combineInputsWithGPT4V({
+            text: generatedPrompt,
+            speechText: "",
+            sketchAnalysis: sketch,
+            photoAnalysis: photo,
         });
-
-        console.log("Multimodal processing completed successfully");
-        return unifiedAnalysis;
     }
 
     private async processSketchWithTimeout(sketch: string): Promise<any> {
@@ -992,6 +1065,275 @@ export class MultimodalProcessor {
             console.error("Error extracting model data:", error);
             return { error: "Failed to parse model data", rawContent: content };
         }
+    }
+
+    // Smart text-based model generation that actually uses user input
+    private generateFromTextFallback(text: string): any {
+        console.log("Generating intelligent model from text:", text.substring(0, 100) + "...");
+        
+        const analysis = this.analyzeTextRequirements(text);
+        const modelData = this.generateModelFromAnalysis(analysis);
+        
+        return {
+            modelData,
+            metadata: {
+                inputModalities: { text: true, sketch: false, speech: false, photo: false },
+                modelStatistics: {
+                    roomCount: modelData.rooms?.length || 0,
+                    windowCount: modelData.windows?.length || 0, 
+                    doorCount: modelData.doors?.length || 0,
+                    totalArea: this.calculateTotalArea(modelData.rooms || []),
+                },
+                generationMethod: "intelligent_text_parsing",
+                note: "Generated using intelligent text analysis (Azure not available)"
+            },
+            rawResponse: `Generated from text: "${text.substring(0, 200)}..."`
+        };
+    }
+
+    private analyzeTextRequirements(text: string): any {
+        const lower = text.toLowerCase();
+        const analysis = {
+            buildingType: "residential", // default
+            rooms: [],
+            features: [],
+            style: "modern",
+            size: "medium",
+            floors: 1
+        };
+
+        // Detect building type
+        if (lower.includes("office") || lower.includes("commercial") || lower.includes("business")) {
+            analysis.buildingType = "commercial";
+        } else if (lower.includes("hotel") || lower.includes("restaurant") || lower.includes("retail")) {
+            analysis.buildingType = "hospitality";
+        }
+
+        // Extract room requirements
+        const roomPatterns = {
+            bedroom: /(\d+)?[\s-]*(bed|bedroom)s?/gi,
+            bathroom: /(\d+)?[\s-]*(bath|bathroom)s?/gi,
+            kitchen: /kitchen|cooking|culinary/gi,
+            living: /living\s*room|lounge|family\s*room/gi,
+            dining: /dining\s*room|dining\s*area/gi,
+            office: /office|study|workspace|home\s*office/gi,
+            garage: /garage|parking/gi,
+            basement: /basement|cellar/gi,
+            attic: /attic|loft/gi,
+            utility: /utility|laundry|storage/gi
+        };
+
+        Object.entries(roomPatterns).forEach(([roomType, pattern]) => {
+            const matches = text.match(pattern);
+            if (matches) {
+                const countMatch = matches[0].match(/\d+/);
+                const count = countMatch ? parseInt(countMatch[0]) : 1;
+                
+                for (let i = 0; i < count; i++) {
+                    analysis.rooms.push({
+                        type: roomType,
+                        name: count > 1 ? `${roomType}${i + 1}` : roomType
+                    });
+                }
+            }
+        });
+
+        // If no specific rooms mentioned, create reasonable defaults
+        if (analysis.rooms.length === 0) {
+            if (analysis.buildingType === "commercial") {
+                analysis.rooms = [
+                    { type: "office", name: "main_office" },
+                    { type: "meeting", name: "conference_room" },
+                    { type: "reception", name: "lobby" }
+                ];
+            } else {
+                analysis.rooms = [
+                    { type: "living", name: "living_room" },
+                    { type: "kitchen", name: "kitchen" },
+                    { type: "bedroom", name: "bedroom" },
+                    { type: "bathroom", name: "bathroom" }
+                ];
+            }
+        }
+
+        // Detect size hints
+        if (lower.includes("large") || lower.includes("spacious") || lower.includes("luxury")) {
+            analysis.size = "large";
+        } else if (lower.includes("small") || lower.includes("compact") || lower.includes("tiny")) {
+            analysis.size = "small";
+        }
+
+        // Detect style
+        if (lower.includes("modern") || lower.includes("contemporary")) {
+            analysis.style = "modern";
+        } else if (lower.includes("traditional") || lower.includes("classic")) {
+            analysis.style = "traditional";
+        } else if (lower.includes("industrial")) {
+            analysis.style = "industrial";
+        }
+
+        // Detect floors
+        const floorMatch = lower.match(/(\d+)[\s-]*(story|stories|floor|floors)/);
+        if (floorMatch) {
+            analysis.floors = parseInt(floorMatch[1]);
+        }
+
+        return analysis;
+    }
+
+    private generateModelFromAnalysis(analysis: any): any {
+        const sizeMultipliers = { small: 0.7, medium: 1.0, large: 1.4 };
+        const multiplier = sizeMultipliers[analysis.size] || 1.0;
+        
+        const baseRoomSizes = {
+            living: { width: 5, length: 6 },
+            bedroom: { width: 3.5, length: 4 },
+            bathroom: { width: 2.5, length: 3 },
+            kitchen: { width: 3, length: 4 },
+            dining: { width: 3.5, length: 4 },
+            office: { width: 4, length: 5 },
+            garage: { width: 6, length: 7 },
+            utility: { width: 2, length: 2.5 },
+            reception: { width: 6, length: 8 },
+            meeting: { width: 4, length: 6 }
+        };
+
+        const rooms = [];
+        const doors = [];
+        const windows = [];
+        
+        let currentX = 0;
+        let currentZ = 0;
+        let maxRowHeight = 0;
+
+        analysis.rooms.forEach((roomReq: any, index: number) => {
+            const baseSize = baseRoomSizes[roomReq.type] || { width: 4, length: 4 };
+            const width = Math.round(baseSize.width * multiplier * 10) / 10;
+            const length = Math.round(baseSize.length * multiplier * 10) / 10;
+            
+            // Simple grid layout
+            if (currentX + width > 15) { // Max width before new row
+                currentX = 0;
+                currentZ += maxRowHeight + 0.5; // Add some spacing
+                maxRowHeight = 0;
+            }
+
+            const room = {
+                name: roomReq.name,
+                width,
+                length,
+                height: 3,
+                x: currentX,
+                y: 0,
+                z: currentZ,
+                connected_to: []
+            };
+
+            rooms.push(room);
+
+            // Add connections to adjacent rooms
+            if (index > 0) {
+                const prevRoom = rooms[index - 1];
+                room.connected_to.push(prevRoom.name);
+                prevRoom.connected_to.push(room.name);
+                
+                doors.push({
+                    from: prevRoom.name,
+                    to: room.name,
+                    width: 0.9,
+                    height: 2.1
+                });
+            }
+
+            // Add windows to most rooms (except bathrooms and utility)
+            if (!["bathroom", "utility"].includes(roomReq.type)) {
+                windows.push({
+                    room: room.name,
+                    wall: "south",
+                    width: Math.min(width * 0.4, 2),
+                    height: 1.2,
+                    position: 0.5
+                });
+            }
+
+            currentX += width + 0.5; // Add some spacing
+            maxRowHeight = Math.max(maxRowHeight, length);
+        });
+
+        return { rooms, windows, doors };
+    }
+
+    private enhanceWithVisualData(textResult: any, sketchData: any, photoData: any): any {
+        console.log("Enhancing text result with visual data");
+        
+        // Combine the text-based model with visual insights
+        let enhancedModel = { ...textResult.modelData };
+        
+        if (sketchData && sketchData.rooms) {
+            // Use sketch room layout if available
+            enhancedModel.rooms = sketchData.rooms.map((sketchRoom: any) => ({
+                ...sketchRoom,
+                name: sketchRoom.name || `room_${sketchRoom.x}_${sketchRoom.z}`
+            }));
+        }
+        
+        if (photoData && photoData.architecturalFeatures) {
+            // Apply architectural style from photo
+            const style = photoData.architecturalFeatures.style;
+            if (style && style !== "unknown") {
+                enhancedModel.style = style;
+            }
+        }
+
+        return {
+            ...textResult,
+            modelData: enhancedModel,
+            metadata: {
+                ...textResult.metadata,
+                visualEnhancement: true,
+                sketchUsed: !!sketchData,
+                photoUsed: !!photoData
+            }
+        };
+    }
+
+    private generatePromptFromVisuals(sketchData: any, photoData: any): string {
+        let prompt = "Generate an architectural model based on visual analysis: ";
+        
+        if (sketchData && sketchData.rooms) {
+            const roomNames = sketchData.rooms.map((r: any) => r.name || r.type).join(", ");
+            prompt += `Sketch shows rooms: ${roomNames}. `;
+        }
+        
+        if (photoData && photoData.description) {
+            prompt += `Photo analysis: ${photoData.description}. `;
+        }
+        
+        if (photoData && photoData.architecturalFeatures) {
+            prompt += `Architectural style: ${photoData.architecturalFeatures.style}. `;
+        }
+
+        return prompt || "Generate a modern architectural model from visual inputs";
+    }
+
+    private processSketchOptimized(sketch: string): Promise<any> {
+        // Optimized sketch processing with faster timeout
+        return Promise.race([
+            analyzeSketch(sketch),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Sketch processing timeout")), 10000)
+            )
+        ]);
+    }
+
+    private processPhotoOptimized(photo: string): Promise<any> {
+        // Optimized photo processing
+        return Promise.race([
+            this.processPhoto(photo),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Photo processing timeout")), 12000)
+            )
+        ]);
     }
 
     private extractModelMetadata(modelData: any, inputs: any): any {

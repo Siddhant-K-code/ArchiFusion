@@ -22,33 +22,38 @@ export async function generateCadModel(
       - Speech data: ${speechData ? "provided" : "none"}
       - Photo data: ${photoData ? "provided" : "none"}`);
 
-        // If we have any multimodal inputs (sketch, speech, or photo), use the multimodal processor
+        // Always try the optimized path first
         if (sketchData || speechData || photoData) {
-            console.log("Using multimodal processor for non-text inputs");
+            console.log("Using optimized multimodal processor");
 
-            // Process multiple input modalities
-            const processorResult =
-                await multimodalProcessor.processMultimodalInput({
+            try {
+                const processorResult = await multimodalProcessor.processMultimodalInput({
                     text: prompt,
                     sketch: sketchData || undefined,
                     speech: speechData || undefined,
                     photo: photoData || undefined,
                 });
 
-            // Use the extracted model directly if valid
-            if (processorResult.modelData && processorResult.modelData.rooms) {
-                return {
-                    modelData: processorResult.modelData,
-                    code: processorResult.code || generateMockCode(prompt),
-                    metadata: processorResult.metadata,
-                };
-            }
+                // Use the model if it's valid
+                if (processorResult.modelData && processorResult.modelData.rooms && processorResult.modelData.rooms.length > 0) {
+                    return {
+                        modelData: processorResult.modelData,
+                        code: processorResult.code || this.generateCodeFromModel(processorResult.modelData),
+                        metadata: {
+                            ...processorResult.metadata,
+                            processingPath: "optimized_multimodal"
+                        },
+                    };
+                }
 
-            // If no valid model was extracted, continue with the agent orchestrator
-            prompt = processorResult.rawResponse || prompt;
+                // Extract better prompt from processing
+                prompt = processorResult.rawResponse || prompt;
+            } catch (error) {
+                console.warn("Multimodal processing failed, continuing with text-only:", error);
+            }
         }
 
-        // For single-modality inputs or as a fallback, use the agent orchestrator
+        // For text-only or as fallback, use optimized agent orchestrator  
         const result = await agentOrchestrator.processDesignRequest(
             prompt,
             sketchData
@@ -57,7 +62,7 @@ export async function generateCadModel(
         // Return the processed result
         return {
             modelData: result.modelData,
-            code: result.code,
+            code: result.code || this.generateCodeFromModel(result.modelData),
             metadata: {
                 inputModalities: {
                     text: !!prompt,
@@ -65,8 +70,70 @@ export async function generateCadModel(
                     speech: !!speechData,
                     photo: !!photoData,
                 },
+                processingPath: "agent_orchestrator"
             },
         };
+    }
+
+    private generateCodeFromModel(modelData: any): string {
+        if (!modelData || !modelData.rooms) {
+            return generateMockCode("Simple building");
+        }
+
+        const rooms = modelData.rooms;
+        const roomNames = rooms.map((r: any) => r.name).join(", ");
+        
+        return `// Generated Three.js code for: ${roomNames}
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf0f0f0);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(15, 15, 15);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+
+// Create rooms from model data
+${rooms.map((room: any) => `
+// Room: ${room.name}
+const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Geometry = new THREE.BoxGeometry(${room.width}, ${room.height}, ${room.length});
+const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Material = new THREE.MeshLambertMaterial({ 
+    color: 0x${Math.floor(Math.random()*16777215).toString(16)},
+    transparent: true,
+    opacity: 0.8
+});
+const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Mesh = new THREE.Mesh(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Geometry, ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Material);
+${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Mesh.position.set(${room.x + room.width/2}, ${room.y + room.height/2}, ${room.z + room.length/2});
+scene.add(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Mesh);
+
+// Room edges
+const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Edges = new THREE.EdgesGeometry(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Geometry);
+const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Line = new THREE.LineSegments(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
+${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Line.position.copy(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Mesh.position);
+scene.add(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Line);`).join('\n')}
+
+// Add lighting
+const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+directionalLight.position.set(10, 10, 5);
+scene.add(directionalLight);
+
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+animate();`;
+    }
     } catch (error) {
         console.error("Error in enhanced generateCadModel:", error);
 

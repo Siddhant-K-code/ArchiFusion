@@ -1,5 +1,7 @@
 "use client";
 import { ModeToggle } from "./mode-toggle";
+import { Github } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function Header() {
     return (
@@ -11,6 +13,21 @@ export function Header() {
                 <span className="font-bold text-xl">ArchiFusion - Transform Ideas into 3D Architecture</span>
             </div>
             <div className="flex-1 flex items-center justify-end space-x-3">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    asChild
+                    className="h-9 w-9 bg-muted hover:bg-muted/80 border"
+                >
+                    <a
+                        href="https://github.com/Siddhant-K-code/ArchiFusion"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="GitHub Repository"
+                    >
+                        <Github className="h-4 w-4" />
+                    </a>
+                </Button>
                 <ModeToggle />
             </div>
         </header>

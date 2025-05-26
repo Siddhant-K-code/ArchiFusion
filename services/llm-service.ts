@@ -38,7 +38,7 @@ export async function generateCadModel(
                 if (processorResult.modelData && processorResult.modelData.rooms && processorResult.modelData.rooms.length > 0) {
                     return {
                         modelData: processorResult.modelData,
-                        code: processorResult.code || this.generateCodeFromModel(processorResult.modelData),
+                        code: processorResult.code || generateCodeFromModel(processorResult.modelData),
                         metadata: {
                             ...processorResult.metadata,
                             processingPath: "optimized_multimodal"
@@ -62,7 +62,7 @@ export async function generateCadModel(
         // Return the processed result
         return {
             modelData: result.modelData,
-            code: result.code || this.generateCodeFromModel(result.modelData),
+            code: result.code || generateCodeFromModel(result.modelData),
             metadata: {
                 inputModalities: {
                     text: !!prompt,
@@ -73,67 +73,6 @@ export async function generateCadModel(
                 processingPath: "agent_orchestrator"
             },
         };
-    }
-
-    private generateCodeFromModel(modelData: any): string {
-        if (!modelData || !modelData.rooms) {
-            return generateMockCode("Simple building");
-        }
-
-        const rooms = modelData.rooms;
-        const roomNames = rooms.map((r: any) => r.name).join(", ");
-        
-        return `// Generated Three.js code for: ${roomNames}
-import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xf0f0f0);
-
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(15, 15, 15);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
-
-const controls = new OrbitControls(camera, renderer.domElement);
-
-// Create rooms from model data
-${rooms.map((room: any) => `
-// Room: ${room.name}
-const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Geometry = new THREE.BoxGeometry(${room.width}, ${room.height}, ${room.length});
-const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Material = new THREE.MeshLambertMaterial({ 
-    color: 0x${Math.floor(Math.random()*16777215).toString(16)},
-    transparent: true,
-    opacity: 0.8
-});
-const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Mesh = new THREE.Mesh(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Geometry, ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Material);
-${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Mesh.position.set(${room.x + room.width/2}, ${room.y + room.height/2}, ${room.z + room.length/2});
-scene.add(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Mesh);
-
-// Room edges
-const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Edges = new THREE.EdgesGeometry(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Geometry);
-const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Line = new THREE.LineSegments(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
-${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Line.position.copy(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Mesh.position);
-scene.add(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Line);`).join('\n')}
-
-// Add lighting
-const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
-scene.add(ambientLight);
-
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-directionalLight.position.set(10, 10, 5);
-scene.add(directionalLight);
-
-function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
-}
-
-animate();`;
-    }
     } catch (error) {
         console.error("Error in enhanced generateCadModel:", error);
 
@@ -196,6 +135,67 @@ function generateFallbackCadModel(prompt: string, sketchData?: string | null) {
             note: "Fallback model generated due to processing error",
         },
     };
+}
+
+// Generate Three.js code from model data
+function generateCodeFromModel(modelData: any): string {
+    if (!modelData || !modelData.rooms) {
+        return generateMockCode("Simple building");
+    }
+
+    const rooms = modelData.rooms;
+    const roomNames = rooms.map((r: any) => r.name).join(", ");
+    
+    return `// Generated Three.js code for: ${roomNames}
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf0f0f0);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(15, 15, 15);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+
+// Create rooms from model data
+${rooms.map((room: any) => `
+// Room: ${room.name}
+const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Geometry = new THREE.BoxGeometry(${room.width}, ${room.height}, ${room.length});
+const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Material = new THREE.MeshLambertMaterial({ 
+    color: 0x${Math.floor(Math.random()*16777215).toString(16)},
+    transparent: true,
+    opacity: 0.8
+});
+const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Mesh = new THREE.Mesh(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Geometry, ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Material);
+${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Mesh.position.set(${room.x + room.width/2}, ${room.y + room.height/2}, ${room.z + room.length/2});
+scene.add(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Mesh);
+
+// Room edges
+const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Edges = new THREE.EdgesGeometry(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Geometry);
+const ${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Line = new THREE.LineSegments(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
+${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Line.position.copy(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Mesh.position);
+scene.add(${room.name.replace(/[^a-zA-Z0-9]/g, '_')}Line);`).join('\n')}
+
+// Add lighting
+const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+directionalLight.position.set(10, 10, 5);
+scene.add(directionalLight);
+
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+animate();`;
 }
 
 // Make sure you also have the generateMockCode function

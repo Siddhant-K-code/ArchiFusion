@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,14 +39,23 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
 import { CadModelViewer } from "@/components/cad-model-viewer";
 import { InputPanel } from "@/components/input-panel";
+import { UpgradeModal } from "@/components/upgrade-modal";
 
 export default function Home() {
+    const { data: session } = useSession();
     const [prompt, setPrompt] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
     const [generatedModel, setGeneratedModel] = useState<any>(null);
     const [generatedCode, setGeneratedCode] = useState("");
     const [activeTab, setActiveTab] = useState("visual");
     const [copied, setCopied] = useState(false);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [userUsage, setUserUsage] = useState<{
+        generationsUsed: number;
+        generationsRemaining: string | number;
+        isPro: boolean;
+        canGenerate: boolean;
+    } | null>(null);
     const [viewerSettings, setViewerSettings] = useState({
         showGrid: true,
         showAxes: true,
@@ -80,6 +90,25 @@ export default function Home() {
 
     const codeRef = useRef<HTMLPreElement>(null);
 
+    // Fetch user usage on component mount and when session changes
+    useEffect(() => {
+        const fetchUsage = async () => {
+            if (!session) return;
+            
+            try {
+                const response = await fetch("/api/usage");
+                if (response.ok) {
+                    const usage = await response.json();
+                    setUserUsage(usage);
+                }
+            } catch (error) {
+                console.error("Error fetching usage:", error);
+            }
+        };
+
+        fetchUsage();
+    }, [session]);
+
     // Effect to handle window resize during dragging
     useEffect(() => {
         const handleWindowResize = () => {
@@ -107,6 +136,22 @@ export default function Home() {
     };
 
     const handleGenerate = async (inputs: { prompt: any; sketchData: any; speechData: any; photoData: any; }) => {
+        // Check if user is authenticated
+        if (!session) {
+            toast({
+                title: "Authentication Required",
+                description: "Please sign in to generate architectural models.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        // Check usage limits
+        if (userUsage && !userUsage.canGenerate) {
+            setShowUpgradeModal(true);
+            return;
+        }
+
         // Reset processing steps
         setProcessingSteps({
             sketch: "pending",
@@ -118,6 +163,24 @@ export default function Home() {
         setIsGenerating(true);
 
         try {
+            // Increment usage counter
+            const usageResponse = await fetch("/api/usage", {
+                method: "POST",
+            });
+
+            if (!usageResponse.ok) {
+                const usageError = await usageResponse.json();
+                if (usageError.needsUpgrade) {
+                    setShowUpgradeModal(true);
+                    setIsGenerating(false);
+                    return;
+                }
+                throw new Error("Failed to update usage");
+            }
+
+            // Update local usage state
+            const updatedUsage = await usageResponse.json();
+            setUserUsage(updatedUsage);
             // Extract inputs from the InputPanel component
             const { prompt, sketchData, speechData, photoData } = inputs;
 
@@ -1418,6 +1481,13 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
                     </div>
                 </div>
             </div>
+
+            {/* Upgrade Modal */}
+            <UpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                generationsUsed={userUsage?.generationsUsed || 0}
+            />
         </div>
     );
 }

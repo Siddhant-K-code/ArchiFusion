@@ -3,6 +3,7 @@ import "@/app/globals.css";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
+import { AuthSessionProvider } from "@/components/providers/session-provider";
 
 import { Header } from "@/components/header";
 
@@ -32,19 +33,21 @@ export default function RootLayout({
     return (
         <html lang="en" suppressHydrationWarning>
             <body className={`${inter.className} min-h-screen bg-background`} suppressHydrationWarning>
-                <ThemeProvider
-                    attribute="class"
-                    defaultTheme="system"
-                    enableSystem
-                >
-                    <div className="flex flex-col h-screen overflow-hidden">
-                        <Header />
-                        <main className="relative flex-1 overflow-y-auto focus:outline-none">
-                            {children}
-                        </main>
-                    </div>
-                    <Toaster />
-                </ThemeProvider>
+                <AuthSessionProvider>
+                    <ThemeProvider
+                        attribute="class"
+                        defaultTheme="system"
+                        enableSystem
+                    >
+                        <div className="flex flex-col h-screen overflow-hidden">
+                            <Header />
+                            <main className="relative flex-1 overflow-y-auto focus:outline-none">
+                                {children}
+                            </main>
+                        </div>
+                        <Toaster />
+                    </ThemeProvider>
+                </AuthSessionProvider>
             </body>
         </html>
     );

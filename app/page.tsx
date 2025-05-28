@@ -38,6 +38,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
 import { CadModelViewer } from "@/components/cad-model-viewer";
 import { InputPanel } from "@/components/input-panel";
+import { CADJobStatus } from "@/components/cad-job-status";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function Home() {
     const [prompt, setPrompt] = useState("");
@@ -106,17 +108,10 @@ export default function Home() {
         }));
     };
 
+    const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+    const [showJobStatus, setShowJobStatus] = useState(false);
+
     const handleGenerate = async (inputs: { prompt: any; sketchData: any; speechData: any; photoData: any; }) => {
-        // Reset processing steps
-        setProcessingSteps({
-            sketch: "pending",
-            vision: "pending",
-            openai: "pending",
-            model: "pending",
-        });
-
-        setIsGenerating(true);
-
         try {
             // Extract inputs from the InputPanel component
             const { prompt, sketchData, speechData, photoData } = inputs;
@@ -124,19 +119,7 @@ export default function Home() {
             // Update prompt state for consistency with other parts of the app
             setPrompt(prompt || "");
 
-            // Mark sketch processing as complete if not using sketch
-            if (!sketchData) {
-                updateProcessingStep("sketch", "completed");
-            } else {
-                // Mark sketch processing as active then complete
-                updateProcessingStep("sketch", "processing");
-                setTimeout(
-                    () => updateProcessingStep("sketch", "completed"),
-                    500
-                );
-            }
-
-            // Prepare request payload - matches Azure API expectations
+            // Prepare request payload
             const payload: Record<string, any> = {};
 
             // Always include a prompt
@@ -149,29 +132,19 @@ export default function Home() {
                 payload.prompt = "Generate a CAD model based on this input";
             }
 
-            // Add sketch data if available
-            if (sketchData) {
-                payload.sketchData = sketchData;
-            }
+            // Add other data if available
+            if (sketchData) payload.sketchData = sketchData;
+            if (photoData) payload.photoData = photoData;
+            if (speechData) payload.speechData = speechData;
 
-            // Add photo data if available
-            if (photoData) {
-                payload.photoData = photoData;
-                // When using photo, mark vision processing as active
-                updateProcessingStep("vision", "processing");
-            }
-
-            console.log("Generating CAD model with Azure services:", {
+            console.log("Starting CAD generation job:", {
                 hasPrompt: !!payload.prompt,
                 hasSketchData: !!payload.sketchData,
                 hasPhotoData: !!payload.photoData,
-                hasSpeechData: !!speechData,
+                hasSpeechData: !!payload.speechData,
             });
 
-            // Mark OpenAI processing as active
-            updateProcessingStep("openai", "processing");
-
-            // Call our API endpoint - connects to Azure services
+            // Start the job
             const response = await fetch("/api/cad-generator", {
                 method: "POST",
                 headers: {
@@ -180,69 +153,27 @@ export default function Home() {
                 body: JSON.stringify(payload),
             });
 
-            // If sketch or photo was provided, mark vision processing as complete
-            if (sketchData || photoData) {
-                updateProcessingStep("vision", "completed");
-            }
-
-            // Mark OpenAI processing as complete
-            updateProcessingStep("openai", "completed");
-
-            // Mark model generation as active
-            updateProcessingStep("model", "processing");
-
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                updateProcessingStep("model", "error");
                 throw new Error(
-                    `Failed to generate model with Azure: ${response.status} ${
-                        response.statusText
-                    }${errorData.details ? ` - ${errorData.details}` : ""}`
+                    errorData.error || `Failed to start generation: ${response.status}`
                 );
             }
 
-            const data = await response.json();
-            console.log("Azure API Response:", data);
+            const { jobId } = await response.json();
+            setCurrentJobId(jobId);
+            setShowJobStatus(true);
+            setIsGenerating(true);
 
-            if (!data.modelData || !data.code) {
-                console.error("Invalid response format from Azure:", data);
-                updateProcessingStep("model", "error");
-                throw new Error("Invalid response format from Azure API");
-            }
-
-            // Ensure the modelData has the expected structure
-            if (
-                !Array.isArray(data.modelData.rooms) ||
-                data.modelData.rooms.length === 0
-            ) {
-                console.error(
-                    "Invalid or empty rooms array from Azure:",
-                    data.modelData
-                );
-                updateProcessingStep("model", "error");
-                throw new Error(
-                    "Invalid model data from Azure: no rooms found"
-                );
-            }
-
-            // Mark model generation as complete
-            updateProcessingStep("model", "completed");
-
-            setGeneratedModel(data.modelData);
-            setGeneratedCode(data.code);
-            setActiveTab("visual");
-
-            // If we're in input-focus mode, switch to viewer-focus after generation
-            if (layoutMode === "input-focus") {
-                setLayoutMode("viewer-focus");
-            }
+            console.log(`CAD generation job started: ${jobId}`);
 
             toast({
-                title: "Model generated successfully",
-                description: "Your CAD model has been created using Azure AI.",
+                title: "Generation started",
+                description: "Your CAD model is being generated. This may take up to 60 seconds.",
             });
+
         } catch (error) {
-            console.error("Error with Azure services:", error);
+            console.error("Error starting CAD generation:", error);
 
             // Update any pending steps to error
             Object.keys(processingSteps).forEach((step) => {
@@ -275,6 +206,80 @@ export default function Home() {
         } finally {
             setIsGenerating(false);
         }
+    };
+
+    const handleJobComplete = (result: any) => {
+        console.log("CAD generation job completed:", result);
+        
+        if (!result.modelData || !result.code) {
+            console.error("Invalid response format from job:", result);
+            toast({
+                title: "Generation failed",
+                description: "Invalid response format received.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        // Ensure the modelData has the expected structure
+        if (!Array.isArray(result.modelData.rooms) || result.modelData.rooms.length === 0) {
+            console.error("Invalid or empty rooms array from job:", result.modelData);
+            toast({
+                title: "Generation failed", 
+                description: "No valid rooms found in generated model.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setGeneratedModel(result.modelData);
+        setGeneratedCode(result.code);
+        setActiveTab("visual");
+        setShowJobStatus(false);
+        setIsGenerating(false);
+
+        // If we're in input-focus mode, switch to viewer-focus after generation
+        if (layoutMode === "input-focus") {
+            setLayoutMode("viewer-focus");
+        }
+
+        toast({
+            title: "Model generated successfully",
+            description: "Your CAD model has been created successfully.",
+        });
+    };
+
+    const handleJobError = (error: string) => {
+        console.error("CAD generation job failed:", error);
+        setShowJobStatus(false);
+        setIsGenerating(false);
+
+        // Fallback to mock data
+        const mockResponse = {
+            modelData: generateMockModelData(prompt || "Floor plan from input"),
+            code: generateMockCode(prompt || "Floor plan from input"),
+        };
+
+        setGeneratedModel(mockResponse.modelData);
+        setGeneratedCode(mockResponse.code);
+        setActiveTab("visual");
+
+        toast({
+            title: "Generation failed, using fallback",
+            description: error + ". Using sample data instead.",
+            variant: "destructive",
+        });
+    };
+
+    const handleJobCancel = () => {
+        setShowJobStatus(false);
+        setCurrentJobId(null);
+        setIsGenerating(false);
+        
+        toast({
+            title: "Generation cancelled",
+            description: "CAD model generation has been cancelled.",
+        });
     };
 
     const handleCopyCode = () => {
@@ -1418,6 +1423,23 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
                     </div>
                 </div>
             </div>
+
+            {/* CAD Generation Job Status Dialog */}
+            <Dialog open={showJobStatus} onOpenChange={setShowJobStatus}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Generating CAD Model</DialogTitle>
+                    </DialogHeader>
+                    {currentJobId && (
+                        <CADJobStatus
+                            jobId={currentJobId}
+                            onComplete={handleJobComplete}
+                            onError={handleJobError}
+                            onCancel={handleJobCancel}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

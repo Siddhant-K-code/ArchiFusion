@@ -1,12 +1,22 @@
 import { NextResponse } from "next/server";
-import { multimodalProcessor } from "@/services/multimodal-processor";
-import { AgentOrchestrator } from "@/services/agent-orchestrator";
 
-// Initialize agent orchestrator
-const agentOrchestrator = new AgentOrchestrator();
+// Dynamic imports to avoid initialization during build
+let multimodalProcessor: any;
+let AgentOrchestrator: any;
+let agentOrchestrator: any;
 
 export async function POST(req: Request) {
     try {
+        // Initialize services dynamically
+        if (!multimodalProcessor) {
+            const { multimodalProcessor: mp } = await import("@/services/multimodal-processor");
+            multimodalProcessor = mp;
+        }
+        if (!agentOrchestrator) {
+            const { AgentOrchestrator } = await import("@/services/agent-orchestrator");
+            agentOrchestrator = new AgentOrchestrator();
+        }
+
         // Parse the request body
         const body = await req.json();
         const { text, sketch, speech, photo } = body;

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { generateCadModel } from "@/services/llm-service";
+
+// Dynamic import to avoid initialization during build
+let generateCadModel: any;
 
 // Simple in-memory job store (use Redis/database in production)
 const jobs = new Map<string, { 
@@ -12,6 +14,12 @@ const jobs = new Map<string, {
 
 export async function POST(req: Request) {
     try {
+        // Initialize service dynamically
+        if (!generateCadModel) {
+            const { generateCadModel: gcm } = await import("@/services/llm-service");
+            generateCadModel = gcm;
+        }
+
         const body = await req.json();
         const { prompt, sketchData, speechData, photoData } = body;
 

@@ -46,10 +46,10 @@ export function InputPanel({ onGenerateModel, isGenerating }: InputPanelProps) {
   // Input state
   const [textPrompt, setTextPrompt] = useState("");
   const [photoData, setPhotoData] = useState<string | null>(null);
-  
+
   // Active tab state
   const [activeTab, setActiveTab] = useState<"text" | "photo">("text");
-  
+
   // UI state
   const [showExamples, setShowExamples] = useState(false);
   const [showTips, setShowTips] = useState(false);
@@ -154,7 +154,7 @@ export function InputPanel({ onGenerateModel, isGenerating }: InputPanelProps) {
     setTextPrompt(example);
     setActiveTab("text");
     setShowExamples(false); // Auto-close after selection for smoother UX
-    
+
     // Show success feedback
     toast({
       title: "✨ Example loaded",
@@ -164,17 +164,17 @@ export function InputPanel({ onGenerateModel, isGenerating }: InputPanelProps) {
   };
 
   return (
-    <div className="h-full flex flex-col space-y-4 p-4">
+    <div className="h-full flex flex-col space-y-3 md:space-y-4 p-3 md:p-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Architectural Designer</h2>
+      <div className="flex flex-row sm:items-center justify-between gap-2">
+        <h2 className="text-lg md:text-xl font-semibold">Architectural Designer</h2>
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setShowTips(!showTips)}
-          className="text-muted-foreground"
+          className="text-muted-foreground self-start sm:self-auto h-8 text-xs md:text-sm"
         >
-          <Lightbulb className="h-4 w-4 mr-2" />
+          <Lightbulb className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
           Tips
           {showTips ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
         </Button>
@@ -183,9 +183,9 @@ export function InputPanel({ onGenerateModel, isGenerating }: InputPanelProps) {
       {/* Tips Section */}
       {showTips && (
         <Card>
-          <CardContent className="p-4">
-            <h4 className="font-medium mb-2">Creating Better Architectural Descriptions:</h4>
-            <ul className="text-sm space-y-1 list-disc pl-4 text-muted-foreground">
+          <CardContent className="p-3 md:p-4">
+            <h4 className="font-medium mb-2 text-sm md:text-base">Creating Better Architectural Descriptions:</h4>
+            <ul className="text-xs md:text-sm space-y-1 list-disc pl-3 md:pl-4 text-muted-foreground">
               <li>Specify building type (house, office, retail, clinic, etc.)</li>
               <li>Include room count, sizes, and how spaces connect</li>
               <li>Mention architectural style (modern, traditional, industrial)</li>
@@ -198,14 +198,16 @@ export function InputPanel({ onGenerateModel, isGenerating }: InputPanelProps) {
 
       {/* Input Method Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="text" className="flex items-center gap-2">
-            <Wand2 className="h-4 w-4" />
-            Describe Building
+        <TabsList className="grid w-full grid-cols-2 h-9 md:h-10">
+          <TabsTrigger value="text" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+            <Wand2 className="h-3 w-3 md:h-4 md:w-4" />
+            <span className="hidden sm:inline">Describe Building</span>
+            <span className="sm:hidden">Describe</span>
           </TabsTrigger>
-          <TabsTrigger value="photo" className="flex items-center gap-2">
-            <Upload className="h-4 w-4" />
-            Upload Floor Plan
+          <TabsTrigger value="photo" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+            <Upload className="h-3 w-3 md:h-4 md:w-4" />
+            <span className="hidden sm:inline">Upload Floor Plan</span>
+            <span className="sm:hidden">Upload</span>
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -213,26 +215,27 @@ export function InputPanel({ onGenerateModel, isGenerating }: InputPanelProps) {
       {/* Main Input Area */}
       <div className="flex-1 flex flex-col">
         {activeTab === "text" && (
-          <div className="flex-1 flex flex-col space-y-4">
+          <div className="flex-1 flex flex-col space-y-3 md:space-y-4">
             <Textarea
               placeholder="Describe your architectural vision... e.g., 'Design a modern 3-bedroom house with open floor plan and large windows' or 'Create a tech office with collaborative spaces, meeting rooms, and a rooftop terrace'"
-              className="flex-1 resize-none min-h-[200px]"
+              className="flex-1 resize-none min-h-[150px] md:min-h-[200px] text-sm md:text-base"
               value={textPrompt}
               onChange={handleTextChange}
             />
-            
+
             {/* Enhanced Examples Section */}
             <Collapsible open={showExamples} onOpenChange={setShowExamples}>
               <CollapsibleTrigger asChild>
-                <Button variant="outline" className="w-full justify-between group hover:bg-accent/50 transition-colors">
+                <Button variant="outline" className="w-full justify-between group hover:bg-accent/50 transition-colors h-9 md:h-10 text-sm">
                   <div className="flex items-center">
-                    <Sparkles className="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" />
-                    Inspiration Gallery
+                    <Sparkles className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2 group-hover:rotate-12 transition-transform" />
+                    <span className="hidden sm:inline">Inspiration Gallery</span>
+                    <span className="sm:hidden">Examples</span>
                   </div>
-                  {showExamples ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  {showExamples ? <ChevronUp className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronDown className="h-3 w-3 md:h-4 md:w-4" />}
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-4 mt-3">
+              <CollapsibleContent className="space-y-3 md:space-y-4 mt-3">
                 {/* Category Tabs */}
                 <div className="flex flex-wrap gap-1">
                   {Object.entries(examplePrompts).map(([key, category]) => {
@@ -242,15 +245,16 @@ export function InputPanel({ onGenerateModel, isGenerating }: InputPanelProps) {
                         key={key}
                         variant={selectedCategory === key ? "default" : "ghost"}
                         size="sm"
-                        className={`h-8 text-xs transition-all duration-200 hover:scale-105 ${
-                          selectedCategory === key 
-                            ? category.color + " border border-current/20" 
+                        className={`h-7 md:h-8 text-xs transition-all duration-200 hover:scale-105 ${
+                          selectedCategory === key
+                            ? category.color + " border border-current/20"
                             : "hover:bg-accent"
                         }`}
                         onClick={() => handleCategoryChange(key)}
                       >
-                        <IconComponent className="h-3 w-3 mr-1.5" />
-                        {category.label}
+                        <IconComponent className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1 md:mr-1.5" />
+                        <span className="hidden sm:inline">{category.label}</span>
+                        <span className="sm:hidden text-[10px]">{category.label.split(' ')[0]}</span>
                       </Button>
                     );
                   })}
@@ -282,7 +286,7 @@ export function InputPanel({ onGenerateModel, isGenerating }: InputPanelProps) {
                           </div>
                         </div>
                       </Button>
-                      
+
                       {/* Subtle glow effect on hover */}
                       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-lg"></div>
                     </div>
@@ -311,10 +315,10 @@ export function InputPanel({ onGenerateModel, isGenerating }: InputPanelProps) {
         {activeTab === "photo" && (
           <div className="flex-1 flex items-center justify-center">
             <Card className="w-full">
-              <CardContent className="p-8 text-center">
-                <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-medium mb-2">Floor Plan Upload Coming Soon</h3>
-                <p className="text-muted-foreground text-sm">
+              <CardContent className="p-4 md:p-8 text-center">
+                <Upload className="h-8 w-8 md:h-12 md:w-12 mx-auto mb-3 md:mb-4 text-muted-foreground" />
+                <h3 className="text-base md:text-lg font-medium mb-2">Floor Plan Upload Coming Soon</h3>
+                <p className="text-muted-foreground text-xs md:text-sm">
                   Upload existing floor plans, sketches, or architectural drawings for AI analysis and 3D conversion. For now, please describe your building vision in text.
                 </p>
               </CardContent>
@@ -327,27 +331,29 @@ export function InputPanel({ onGenerateModel, isGenerating }: InputPanelProps) {
       <div className="space-y-3">
         {/* Input Status */}
         {textPrompt && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-2">
-            <Wand2 className="h-4 w-4" />
+          <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground bg-muted/50 rounded-lg p-2">
+            <Wand2 className="h-3 w-3 md:h-4 md:w-4" />
             <span>Architectural description ready</span>
           </div>
         )}
 
         {/* Generate Button */}
         <Button
-          className="w-full h-12 text-base"
+          className="w-full h-11 md:h-12 text-sm md:text-base"
           onClick={handleSubmit}
           disabled={isGenerating || !textPrompt}
         >
           {isGenerating ? (
             <>
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              Building Your Architecture...
+              <Loader2 className="h-4 w-4 md:h-5 md:w-5 mr-2 animate-spin" />
+              <span className="hidden sm:inline">Building Your Architecture...</span>
+              <span className="sm:hidden">Building...</span>
             </>
           ) : (
             <>
-              <Wand2 className="h-5 w-5 mr-2" />
-              Build 3D Architecture
+              <Wand2 className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+              <span className="hidden sm:inline">Build 3D Architecture</span>
+              <span className="sm:hidden">Build 3D</span>
             </>
           )}
         </Button>
@@ -356,7 +362,7 @@ export function InputPanel({ onGenerateModel, isGenerating }: InputPanelProps) {
         {(textPrompt || photoData) && (
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full h-9 md:h-10 text-sm"
             onClick={handleClearAll}
             disabled={isGenerating}
           >

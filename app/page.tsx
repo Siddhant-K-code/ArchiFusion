@@ -67,35 +67,11 @@ export default function Home() {
         model: "pending",
     });
 
-    // Layout state
-    const [layoutMode, setLayoutMode] = useState<
-        "horizontal" | "vertical" | "input-focus" | "viewer-focus"
-    >("horizontal");
-    const [inputPanelSize, setInputPanelSize] = useState(40); // percentage
-    const [isResizing, setIsResizing] = useState(false);
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-    const resizeStartRef = useRef<{
-        position: number;
-        startSize: number;
-    } | null>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
+    // Removed complex layout state - using simple responsive design now
 
     const codeRef = useRef<HTMLPreElement>(null);
 
-    // Effect to handle window resize during dragging
-    useEffect(() => {
-        const handleWindowResize = () => {
-            if (isResizing) {
-                setIsResizing(false);
-                resizeStartRef.current = null;
-            }
-        };
-
-        if (typeof window !== "undefined") {
-            window.addEventListener("resize", handleWindowResize);
-            return () => window.removeEventListener("resize", handleWindowResize);
-        }
-    }, [isResizing]);
+    // Removed resize handling - using simple responsive design now
 
     // Function to update processing steps
     const updateProcessingStep = (
@@ -210,7 +186,7 @@ export default function Home() {
 
     const handleJobComplete = (result: any) => {
         console.log("CAD generation job completed:", result);
-        
+
         if (!result.modelData || !result.code) {
             console.error("Invalid response format from job:", result);
             toast({
@@ -225,7 +201,7 @@ export default function Home() {
         if (!Array.isArray(result.modelData.rooms) || result.modelData.rooms.length === 0) {
             console.error("Invalid or empty rooms array from job:", result.modelData);
             toast({
-                title: "Generation failed", 
+                title: "Generation failed",
                 description: "No valid rooms found in generated model.",
                 variant: "destructive",
             });
@@ -238,10 +214,7 @@ export default function Home() {
         setShowJobStatus(false);
         setIsGenerating(false);
 
-        // If we're in input-focus mode, switch to viewer-focus after generation
-        if (layoutMode === "input-focus") {
-            setLayoutMode("viewer-focus");
-        }
+        // Auto-switch not needed anymore with responsive design
 
         toast({
             title: "Model generated successfully",
@@ -275,7 +248,7 @@ export default function Home() {
         setShowJobStatus(false);
         setCurrentJobId(null);
         setIsGenerating(false);
-        
+
         toast({
             title: "Generation cancelled",
             description: "CAD model generation has been cancelled.",
@@ -300,7 +273,7 @@ export default function Home() {
             if (!viewerContainer) {
                 throw new Error('3D viewer not found');
             }
-            
+
             const canvas = viewerContainer.querySelector('canvas');
             if (!canvas) {
                 throw new Error('3D scene not initialized');
@@ -309,7 +282,7 @@ export default function Home() {
             // Get the Three.js renderer and scene from the canvas
             const renderer = (canvas as any).__three_renderer;
             const scene = (canvas as any).__three_scene;
-            
+
             if (!renderer || !scene) {
                 throw new Error('3D scene data not accessible');
             }
@@ -322,7 +295,7 @@ export default function Home() {
                 // Dynamic import of GLTFExporter
                 const { GLTFExporter } = await import('three/examples/jsm/exporters/GLTFExporter.js');
                 const exporter = new GLTFExporter();
-                
+
                 output = await new Promise((resolve, reject) => {
                     exporter.parse(
                         scene,
@@ -335,14 +308,14 @@ export default function Home() {
                         { binary: false }
                     );
                 });
-                
+
                 filename = `architectural_model_${Date.now()}.gltf`;
                 mimeType = 'application/json';
             } else if (format === 'obj') {
                 // Dynamic import of OBJExporter
                 const { OBJExporter } = await import('three/examples/jsm/exporters/OBJExporter.js');
                 const exporter = new OBJExporter();
-                
+
                 output = exporter.parse(scene);
                 filename = `architectural_model_${Date.now()}.obj`;
                 mimeType = 'text/plain';
@@ -519,72 +492,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 `;
     };
 
-    // Resize handlers
-    const handleResizeStart = (e: { preventDefault: () => void; clientX: any; clientY: any; }) => {
-        e.preventDefault();
-
-        let position;
-        if (layoutMode === "horizontal") {
-            position = e.clientX;
-        } else {
-            position = e.clientY;
-        }
-
-        resizeStartRef.current = {
-            position,
-            startSize: inputPanelSize,
-        };
-
-        setIsResizing(true);
-
-        document.addEventListener("mousemove", handleResizeMove);
-        document.addEventListener("mouseup", handleResizeEnd);
-    };
-
-    const handleResizeMove = (e: { clientX: number; clientY: number; }) => {
-        if (!isResizing || !resizeStartRef.current || !containerRef.current)
-            return;
-
-        const containerRect = containerRef.current.getBoundingClientRect();
-        let newSize;
-
-        if (layoutMode === "horizontal") {
-            const containerWidth = containerRect.width;
-            const diff = e.clientX - resizeStartRef.current.position;
-            const diffPercent = (diff / containerWidth) * 100;
-            newSize = Math.min(
-                80,
-                Math.max(20, resizeStartRef.current.startSize + diffPercent)
-            );
-        } else {
-            const containerHeight = containerRect.height;
-            const diff = e.clientY - resizeStartRef.current.position;
-            const diffPercent = (diff / containerHeight) * 100;
-            newSize = Math.min(
-                80,
-                Math.max(20, resizeStartRef.current.startSize + diffPercent)
-            );
-        }
-
-        setInputPanelSize(newSize);
-    };
-
-    const handleResizeEnd = () => {
-        setIsResizing(false);
-        resizeStartRef.current = null;
-
-        document.removeEventListener("mousemove", handleResizeMove);
-        document.removeEventListener("mouseup", handleResizeEnd);
-    };
-
-    // Layout mode handlers
-    const toggleLayoutMode = () => {
-        setLayoutMode(layoutMode === "horizontal" ? "vertical" : "horizontal");
-    };
-
-    const toggleSidebar = () => {
-        setIsSidebarCollapsed(!isSidebarCollapsed);
-    };
+    // Removed complex resize and layout handlers - using simple responsive design now
 
     // Processing status component
     const ProcessingStatus = () => (
@@ -912,227 +820,37 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
         </Card>
     );
 
-    // Layout toolbar
-    const LayoutToolbar = () => (
-        <div className="flex items-center justify-between mb-4 bg-muted/40 rounded-lg p-2">
-            <div className="flex items-center gap-2">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`h-8 px-2 ${
-                        layoutMode === "horizontal" ? "bg-muted" : ""
-                    }`}
-                    onClick={() => setLayoutMode("horizontal")}
-                    title="Horizontal Split"
-                >
-                    <LayoutPanelLeft className="h-4 w-4 mr-1" />
-                    <span className="text-xs">Horizontal</span>
-                </Button>
-                {/* <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`h-8 px-2 ${
-                        layoutMode === "vertical" ? "bg-muted" : ""
-                    }`}
-                    onClick={() => setLayoutMode("vertical")}
-                    title="Vertical Split"
-                >
-                    <LayoutPanelTop className="h-4 w-4 mr-1" />
-                    <span className="text-xs">Vertical</span>
-                </Button>
-                <Separator orientation="vertical" className="h-6 mx-1" />
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`h-8 px-2 ${
-                        layoutMode === "input-focus" ? "bg-muted" : ""
-                    }`}
-                    onClick={() => setLayoutMode("input-focus")}
-                    title="Focus on Input"
-                >
-                    <Shrink className="h-4 w-4 mr-1" />
-                    <span className="text-xs">Input Focus</span>
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`h-8 px-2 ${
-                        layoutMode === "viewer-focus" ? "bg-muted" : ""
-                    }`}
-                    onClick={() => setLayoutMode("viewer-focus")}
-                    title="Focus on Viewer"
-                >
-                    <Expand className="h-4 w-4 mr-1" />
-                    <span className="text-xs">Viewer Focus</span>
-                </Button> */}
-            </div>
-            <div className="flex items-center gap-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8"
-                    onClick={() => {
-                        if (document.fullscreenElement) {
-                            document.exitFullscreen();
-                        } else {
-                            document.documentElement.requestFullscreen();
-                        }
-                    }}
-                >
-                    <Maximize2 className="h-4 w-4 mr-1" />
-                    <span className="text-xs">Fullscreen</span>
-                </Button>
-            </div>
-        </div>
-    );
+    // Layout toolbar removed - using simple responsive design now
 
-    // Determine layout classes and styles based on mode
-    const getLayoutConfig = () => {
-        switch (layoutMode) {
-            case "horizontal":
-                return {
-                    container: "flex flex-col lg:flex-row h-[calc(100vh-6rem)]",
-                    inputPanel: {
-                        className: "flex-shrink-0",
-                        style: { width: `${inputPanelSize}%` }
-                    },
-                    resizer: {
-                        className: "hidden lg:flex w-2 cursor-col-resize hover:bg-accent/50 active:bg-accent",
-                        style: {}
-                    },
-                    viewerPanel: {
-                        className: "flex-grow",
-                        style: { width: `${100 - inputPanelSize}%` }
-                    },
-                };
-            case "vertical":
-                return {
-                    container: "flex flex-col h-[calc(100vh-10rem)]",
-                    inputPanel: {
-                        className: "flex-shrink-0",
-                        style: { height: `${inputPanelSize}%` }
-                    },
-                    resizer: {
-                        className: "h-2 cursor-row-resize hover:bg-accent/50 active:bg-accent",
-                        style: {}
-                    },
-                    viewerPanel: {
-                        className: "flex-grow",
-                        style: { height: `${100 - inputPanelSize}%` }
-                    },
-                };
-            case "input-focus":
-                return {
-                    container: "flex flex-col h-[calc(100vh-10rem)]",
-                    inputPanel: {
-                        className: "h-full flex-grow",
-                        style: {}
-                    },
-                    resizer: {
-                        className: "hidden",
-                        style: {}
-                    },
-                    viewerPanel: {
-                        className: "hidden",
-                        style: {}
-                    },
-                };
-            case "viewer-focus":
-                return {
-                    container: "flex flex-col h-[calc(100vh-10rem)]",
-                    inputPanel: {
-                        className: "hidden",
-                        style: {}
-                    },
-                    resizer: {
-                        className: "hidden",
-                        style: {}
-                    },
-                    viewerPanel: {
-                        className: "h-full flex-grow",
-                        style: {}
-                    },
-                };
-            default:
-                return {
-                    container: "flex flex-col lg:flex-row h-[calc(100vh-6rem)]",
-                    inputPanel: {
-                        className: "lg:w-[40%] flex-shrink-0",
-                        style: {}
-                    },
-                    resizer: {
-                        className: "hidden lg:flex w-2 cursor-col-resize hover:bg-accent/50 active:bg-accent",
-                        style: {}
-                    },
-                    viewerPanel: {
-                        className: "lg:w-[60%] flex-grow",
-                        style: {}
-                    },
-                };
-        }
-    };
-
-    const layoutConfig = getLayoutConfig();
+    // Removed complex layout configuration - using simple responsive design now
 
     return (
-        <div className="container mx-auto py-4">
+        <div className="container mx-auto px-2 py-2 md:px-4 md:py-4 max-w-full">
             <div className="flex flex-col">
-                <div className="flex justify-between items-center">
-                    {/* <h1 className="text-2xl font-bold tracking-tight">
-                        3D Model Generator
-                    </h1> */}
-                    {/* <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                                if (layoutMode === "viewer-focus") {
-                                    setLayoutMode("horizontal");
-                                } else {
-                                    setLayoutMode("viewer-focus");
-                                }
-                            }}
-                        >
-                            {layoutMode === "viewer-focus"
-                                ? "Show Input"
-                                : "Hide Input"}
-                        </Button>
-                    </div> */}
-                </div>
+                {/* Responsive Layout - Mobile: Stack vertically, Desktop: Side by side */}
+                <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-8rem)] overflow-scroll gap-4">
+                    {/* Input Panel - Full width on mobile, 40% on desktop */}
+                    <div className="w-full lg:w-2/5 h-1/2 lg:h-full overflow-auto bg-background rounded-lg border">
+                        <InputPanel
+                            onGenerateModel={handleGenerate}
+                            isGenerating={isGenerating}
+                        />
 
-                {/* <LayoutToolbar /> */}
+                        {isGenerating && (
+                            <div className="p-3 md:p-4">
+                                <ProcessingStatus />
+                            </div>
+                        )}
 
-                <div ref={containerRef} className={layoutConfig.container}>
-                    {/* Input Panel */}
-                    <div
-                        className={`${layoutConfig.inputPanel.className} overflow-auto bg-background`}
-                        style={layoutConfig.inputPanel.style}
-                    >
-                        <div className="h-full flex flex-col">
-                            <InputPanel
-                                onGenerateModel={handleGenerate}
-                                isGenerating={isGenerating}
-                            />
-
-                            {isGenerating && (
-                                <div className="p-4">
-                                    <ProcessingStatus />
-                                </div>
-                            )}
-
-                            {generatedModel && layoutMode !== "vertical" && (
-                                <div className="p-4">
-                                    <ViewerSettings />
-                                </div>
-                            )}
-                        </div>
+                        {generatedModel && (
+                            <div className="p-3 md:p-4 lg:block hidden">
+                                <ViewerSettings />
+                            </div>
+                        )}
                     </div>
 
-                    {/* Viewer Panel */}
-                    <div
-                        className={`${layoutConfig.viewerPanel.className} overflow-auto`}
-                        style={layoutConfig.viewerPanel.style}
-                    >
+                    {/* Viewer Panel - Full width on mobile, 60% on desktop */}
+                    <div className="w-full lg:w-3/5 h-1/2 lg:h-full overflow-auto bg-background rounded-lg border">
                         <div className="h-full flex flex-col">
                             <Card className="flex-grow overflow-hidden">
                                 <CardContent className="p-0 h-full">
@@ -1141,69 +859,33 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
                                         onValueChange={setActiveTab}
                                         className="h-full flex flex-col"
                                     >
-                                        <div className="flex justify-between items-center p-3 border-b">
-                                            <CardTitle className="text-base font-medium">
+                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-2 md:p-3 border-b gap-2">
+                                            <CardTitle className="text-sm md:text-base font-medium">
                                                 Generated Model
                                             </CardTitle>
                                             <div className="flex items-center gap-2">
-                                                <TabsList>
+                                                <TabsList className="h-8 md:h-9">
                                                     <TabsTrigger
                                                         value="visual"
-                                                        className="text-xs px-3 py-1.5"
+                                                        className="text-xs px-2 md:px-3 py-1 md:py-1.5"
                                                     >
                                                         Visual
                                                     </TabsTrigger>
                                                     <TabsTrigger
                                                         value="code"
-                                                        className="text-xs px-3 py-1.5"
+                                                        className="text-xs px-2 md:px-3 py-1 md:py-1.5"
                                                     >
                                                         Code
                                                     </TabsTrigger>
                                                     <TabsTrigger
                                                         value="json"
-                                                        className="text-xs px-3 py-1.5"
+                                                        className="text-xs px-2 md:px-3 py-1 md:py-1.5"
                                                     >
                                                         JSON
                                                     </TabsTrigger>
                                                 </TabsList>
 
-                                                {layoutMode === "vertical" &&
-                                                    generatedModel && (
-                                                        <Select
-                                                            value={
-                                                                viewerSettings.lighting
-                                                            }
-                                                            onValueChange={(
-                                                                value
-                                                            ) =>
-                                                                setViewerSettings(
-                                                                    (prev) => ({
-                                                                        ...prev,
-                                                                        lighting:
-                                                                            value,
-                                                                    })
-                                                                )
-                                                            }
-                                                        >
-                                                            <SelectTrigger className="h-8 w-[110px]">
-                                                                <SelectValue placeholder="Lighting" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="morning">
-                                                                    Morning
-                                                                </SelectItem>
-                                                                <SelectItem value="day">
-                                                                    Day
-                                                                </SelectItem>
-                                                                <SelectItem value="evening">
-                                                                    Evening
-                                                                </SelectItem>
-                                                                <SelectItem value="night">
-                                                                    Night
-                                                                </SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    )}
+                                                {/* Lighting control removed from tabs - available in settings */}
                                             </div>
                                         </div>
 
@@ -1223,33 +905,35 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
                                                             }
                                                         />
 
-                                                        <div className="absolute bottom-4 right-4 flex space-x-2">
+                                                        <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 flex flex-col sm:flex-row gap-2">
                                                             <Button
                                                                 variant="secondary"
                                                                 size="sm"
-                                                                className="gap-2 bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                                                                className="gap-1 md:gap-2 bg-background/80 backdrop-blur-sm hover:bg-background/90 text-xs md:text-sm h-8 md:h-9"
                                                                 onClick={() =>
                                                                     handleSaveModel(
                                                                         "gltf"
                                                                     )
                                                                 }
                                                             >
-                                                                <Save className="h-4 w-4" />
-                                                                Save as GLTF
+                                                                <Save className="h-3 w-3 md:h-4 md:w-4" />
+                                                                <span className="hidden sm:inline">Save as GLTF</span>
+                                                                <span className="sm:hidden">GLTF</span>
                                                             </Button>
                                                             <Button
-                                                                variant="secondary"
-                                                                size="sm"
-                                                                className="gap-2 bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                                                                onClick={() =>
-                                                                    handleSaveModel(
-                                                                        "obj"
-                                                                    )
-                                                                }
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            className="gap-1 md:gap-2 bg-background/80 backdrop-blur-sm hover:bg-background/90 text-xs md:text-sm h-8 md:h-9"
+                                                            onClick={() =>
+                                                            handleSaveModel(
+                                                            "obj"
+                                                            )
+                                                            }
                                                             >
-                                                                <Save className="h-4 w-4" />
-                                                                Save as OBJ
-                                                            </Button>
+                                                            <Save className="h-3 w-3 md:h-4 md:w-4" />
+                                                            <span className="hidden sm:inline">Save as OBJ</span>
+                                                                <span className="sm:hidden">OBJ</span>
+                                                             </Button>
                                                             <Button
                                                                 variant="secondary"
                                                                 size="sm"
